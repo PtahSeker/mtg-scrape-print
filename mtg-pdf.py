@@ -23,12 +23,14 @@ def natural_key(s):
     return [int(t) if t.isdigit() else t.lower()
             for t in re.split(r'(\d+)', s)]
 
-def list_images(folder):
+def list_images(folder, copies=1):
     files = []
     for name in sorted(os.listdir(folder), key=natural_key):
         ext = os.path.splitext(name)[1].lower()
         if ext in IMG_EXTS:
-            files.append(os.path.join(folder, name))
+            # Add multiple copies of each image
+            for _ in range(copies):
+                files.append(os.path.join(folder, name))
     return files
 
 def parse_custom_paper(spec: str):
@@ -68,7 +70,8 @@ def draw_crop_marks(c: canvas.Canvas, x, y, w, h, mark_len=5*mm,
     c.line(x + w + offset, y + h + offset, x + w + offset,
            y + h + offset + mark_len)
 
-def draw_black_borders(c: canvas.Canvas, rows, cols, x0, y0, w, h, dx, dy, gap_mm):
+def draw_black_borders(c: canvas.Canvas, rows, cols, x0, y0, w, h, dx, dy,
+                       gap_mm):
     # Draw black rectangles in the gaps between cards and around outer edges
     c.setFillColor((0, 0, 0))  # black
     
@@ -210,6 +213,8 @@ def main():
                    help="Outer margin (mm)")
     p.add_argument("--gap-mm", type=float, default=3.0,
                    help="Gap between cards (mm)")
+    p.add_argument("--copies", type=int, default=1,
+                   help="Number of copies of each card to include (default: 1)")
     p.add_argument("--cropmarks", action="store_true", help="Add crop marks")
     p.add_argument("--black-borders", action="store_true", 
                    help="Fill gaps with black color for easier cutting")
@@ -224,11 +229,12 @@ def main():
     else:
         paper_size = parse_custom_paper(args.paper)
 
-    imgs = list_images(args.input_folder)
+    imgs = list_images(args.input_folder, copies=args.copies)
     if not imgs:
         raise SystemExit(
             "No images in the folder (supported: .png .jpg/.jpeg).")
 
+    unique_cards = len(imgs) // args.copies
     rows, cols, per_page = make_pdf(
         imgs,
         out_path=args.out,
@@ -242,8 +248,9 @@ def main():
 
     total = len(imgs)
     pages = math.ceil(total / per_page)
-    print((f"Done: {total} images → {args.out} | {rows}*{cols} per page "
-           f"({per_page}/page), {pages} pages."))
+    print((f"Done: {unique_cards} unique cards, {args.copies} "
+           f"copies each = {total} total images → {args.out} | "
+           f"{rows}*{cols} per page ({per_page}/page), {pages} pages."))
 
 if __name__ == "__main__":
     main()
